@@ -53,7 +53,7 @@ pub fn dbscan_parents<const D: usize>(points: &[[f32; D]], radius: f32, min_pts:
 
             label[neighbor_idx] = Label::Cluster {
                 id: current_cluster,
-                prev: neighbor_idx,
+                prev: neighbors_parent_idx,
             };
 
             let neighbors = || accel.query_neighbors(points, neighbor_idx);

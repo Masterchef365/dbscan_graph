@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 fn main() -> Result<()> {
-    launch::<FewPrettyGraphs>(Settings::default())
+    // TODO: get VR as arg. Must modify idek...
+    launch::<FewPrettyGraphs>(Settings::default().vr(std::env::var("VR").is_ok()))
 }
 
 #[derive(Debug, StructOpt)]
@@ -27,8 +28,9 @@ struct Opt {
 
 struct FewPrettyGraphs {
     verts: VertexBuffer,
-    //indices: IndexBuffer,
-    shader: Shader,
+    line_indices: IndexBuffer,
+    points_shader: Shader,
+    lines_shader: Shader,
     camera: MultiPlatformCamera,
 }
 
@@ -51,6 +53,18 @@ impl App for FewPrettyGraphs {
             .take(n_clusters as _)
             .collect();
 
+        let line_indices: Vec<u32> = labels
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, label)| match label {
+                Label::Cluster { prev, .. } => Some([idx as u32, *prev as u32]),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+
+        dbg!(line_indices.len());
+
         let points_vertices: Vec<Vertex> = points
             .into_iter()
             .zip(labels)
@@ -64,24 +78,30 @@ impl App for FewPrettyGraphs {
             })
             .collect();
 
-        //let indices = (0..vertices.len()).collect();
-
         Ok(Self {
-            shader: ctx.shader(
+            points_shader: ctx.shader(
                 include_bytes!("shaders/points.vert.spv"),
                 DEFAULT_FRAGMENT_SHADER,
                 Primitive::Points,
             )?,
+            lines_shader: ctx.shader(
+                DEFAULT_VERTEX_SHADER,
+                DEFAULT_FRAGMENT_SHADER,
+                Primitive::Lines,
+            )?,
             verts: ctx.vertices(&points_vertices, false)?,
-            //indices: ctx.indices(&indices, false)?,
+            line_indices: ctx.indices(&line_indices, false)?,
             camera: MultiPlatformCamera::new(platform),
         })
     }
 
     fn frame(&mut self, _ctx: &mut Context, _: &mut Platform) -> Result<Vec<DrawCmd>> {
-        Ok(vec![DrawCmd::new(self.verts)
-            //.indices(self.indices)
-            .shader(self.shader)])
+        Ok(vec![
+            DrawCmd::new(self.verts).shader(self.points_shader),
+            DrawCmd::new(self.verts)
+                .shader(self.lines_shader)
+                .indices(self.line_indices),
+        ])
     }
 
     fn event(
@@ -129,7 +149,9 @@ pub struct FxHasher {
 impl Default for FxHasher {
     #[inline]
     fn default() -> Self {
-        Self { hash: 0x4234234234129 }
+        Self {
+            hash: 0x4234234234129,
+        }
     }
 }
 
