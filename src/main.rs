@@ -1,10 +1,28 @@
 use few_pretty_graphs::obj::load_obj_verts;
+use few_pretty_graphs::{dbscan_parents, Label};
 use std::ops::BitXor;
 //use idek::{prelude::*, IndexBuffer, MultiPlatformCamera};
 use idek::{prelude::*, MultiPlatformCamera};
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 fn main() -> Result<()> {
-    launch::<FewPrettyGraphs>(Settings::default().vr_if_any_args())
+    launch::<FewPrettyGraphs>(Settings::default())
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "A few pretty graphs", about = "DBSCAN go brrrrr")]
+struct Opt {
+    /// Model
+    obj_path: PathBuf,
+
+    /// Cluster radius
+    #[structopt(short, long)]
+    radius: f32,
+
+    /// Cluster minimum points
+    #[structopt(short, long)]
+    min_pts: usize,
 }
 
 struct FewPrettyGraphs {
@@ -22,10 +40,28 @@ fn u64_color(u: u64) -> [f32; 3] {
 
 impl App for FewPrettyGraphs {
     fn init(ctx: &mut Context, platform: &mut Platform) -> Result<Self> {
-        let vertices: Vec<Vertex> = load_obj_verts("models/bigbunny.obj")?
+        let args = Opt::from_args();
+        let points = load_obj_verts(args.obj_path)?;
+        let (n_clusters, labels) = dbscan_parents(&points, args.radius, args.min_pts);
+
+        dbg!(n_clusters);
+
+        let color_lut: Vec<[f32; 3]> = trivial_random(389204)
+            .map(u64_color)
+            .take(n_clusters as _)
+            .collect();
+
+        let points_vertices: Vec<Vertex> = points
             .into_iter()
-            .zip(trivial_random(0).map(u64_color))
-            .map(|(pos, color)| Vertex { pos, color })
+            .zip(labels)
+            .map(|(pos, label)| Vertex {
+                pos,
+                color: match label {
+                    Label::Undefined => [1., 0., 1.],
+                    Label::Noise => [0.5; 3],
+                    Label::Cluster { id, .. } => color_lut[id as usize],
+                },
+            })
             .collect();
 
         //let indices = (0..vertices.len()).collect();
@@ -36,7 +72,7 @@ impl App for FewPrettyGraphs {
                 DEFAULT_FRAGMENT_SHADER,
                 Primitive::Points,
             )?,
-            verts: ctx.vertices(&vertices, false)?,
+            verts: ctx.vertices(&points_vertices, false)?,
             //indices: ctx.indices(&indices, false)?,
             camera: MultiPlatformCamera::new(platform),
         })
@@ -84,6 +120,8 @@ fn rainbow_cube() -> (Vec<Vertex>, Vec<u32>) {
 }
 */
 
+/// FxHasher
+/// https://nnethercote.github.io/2021/12/08/a-brutally-effective-hash-function-in-rust.html
 pub struct FxHasher {
     pub hash: u64,
 }
@@ -91,7 +129,7 @@ pub struct FxHasher {
 impl Default for FxHasher {
     #[inline]
     fn default() -> Self {
-        Self { hash: 0 }
+        Self { hash: 0x4234234234129 }
     }
 }
 
@@ -109,6 +147,7 @@ impl FxHasher {
     }
 }
 
+/// Produces a stream of pseudorandom values
 fn trivial_random(seed: u64) -> impl Iterator<Item = u64> {
     let mut hasher = FxHasher { hash: seed };
     (0..).map(move |x| {

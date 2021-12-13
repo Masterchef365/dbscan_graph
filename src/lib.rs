@@ -8,7 +8,8 @@ pub enum Label {
     Cluster { id: u32, prev: usize },
 }
 
-pub fn dbscan<const D: usize>(points: &[[f32; D]], radius: f32, min_pts: usize) -> Vec<Label> {
+/// Returns (# of clusters, vector containing the label for each of the points)
+pub fn dbscan_parents<const D: usize>(points: &[[f32; D]], radius: f32, min_pts: usize) -> (u32, Vec<Label>) {
     let mut label = vec![Label::Undefined; points.len()];
 
     let accel = QueryAccelerator::new(points, radius);
@@ -66,5 +67,5 @@ pub fn dbscan<const D: usize>(points: &[[f32; D]], radius: f32, min_pts: usize) 
         current_cluster += 1;
     }
 
-    label
+    (current_cluster, label)
 }
