@@ -1,3 +1,4 @@
+pub mod obj;
 use dbscan::QueryAccelerator;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

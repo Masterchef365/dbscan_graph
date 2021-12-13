@@ -1,19 +1,28 @@
-use idek::{prelude::*, IndexBuffer, MultiPlatformCamera};
+use few_pretty_graphs::obj::load_obj_verts;
+//use idek::{prelude::*, IndexBuffer, MultiPlatformCamera};
+use idek::{prelude::*, MultiPlatformCamera};
 
 fn main() -> Result<()> {
-    launch::<TriangleApp>(Settings::default().vr_if_any_args())
+    launch::<FewPrettyGraphs>(Settings::default().vr_if_any_args())
 }
 
-struct TriangleApp {
+struct FewPrettyGraphs {
     verts: VertexBuffer,
-    indices: IndexBuffer,
+    //indices: IndexBuffer,
     shader: Shader,
     camera: MultiPlatformCamera,
 }
 
-impl App for TriangleApp {
+impl App for FewPrettyGraphs {
     fn init(ctx: &mut Context, platform: &mut Platform) -> Result<Self> {
-        let (vertices, indices) = rainbow_cube();
+        let vertices = load_obj_verts("models/bigbunny.obj")?;
+        let vertices: Vec<Vertex> = vertices.into_iter().map(|pos| Vertex {
+            pos,
+            color: [1.; 3],
+        }).collect();
+
+        //let indices = (0..vertices.len()).collect();
+
         Ok(Self {
             shader: ctx.shader(
                 include_bytes!("shaders/points.vert.spv"),
@@ -21,14 +30,14 @@ impl App for TriangleApp {
                 Primitive::Points,
             )?,
             verts: ctx.vertices(&vertices, false)?,
-            indices: ctx.indices(&indices, false)?,
+            //indices: ctx.indices(&indices, false)?,
             camera: MultiPlatformCamera::new(platform),
         })
     }
 
     fn frame(&mut self, _ctx: &mut Context, _: &mut Platform) -> Result<Vec<DrawCmd>> {
         Ok(vec![DrawCmd::new(self.verts)
-            .indices(self.indices)
+            //.indices(self.indices)
             .shader(self.shader)])
     }
 
@@ -46,6 +55,7 @@ impl App for TriangleApp {
     }
 }
 
+/*
 fn rainbow_cube() -> (Vec<Vertex>, Vec<u32>) {
     let vertices = vec![
         Vertex::new([-1.0, -1.0, -1.0], [0.0, 1.0, 1.0]),
@@ -65,3 +75,4 @@ fn rainbow_cube() -> (Vec<Vertex>, Vec<u32>) {
 
     (vertices, indices)
 }
+*/
