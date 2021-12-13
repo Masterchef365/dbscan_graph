@@ -1,4 +1,5 @@
 use few_pretty_graphs::obj::load_obj_verts;
+use std::ops::BitXor;
 //use idek::{prelude::*, IndexBuffer, MultiPlatformCamera};
 use idek::{prelude::*, MultiPlatformCamera};
 
@@ -13,13 +14,19 @@ struct FewPrettyGraphs {
     camera: MultiPlatformCamera,
 }
 
+fn u64_color(u: u64) -> [f32; 3] {
+    let mut rgb = [0u8; 3];
+    rgb.copy_from_slice(&u.to_le_bytes()[..3]);
+    rgb.map(|x| x as f32 / u8::MAX as f32)
+}
+
 impl App for FewPrettyGraphs {
     fn init(ctx: &mut Context, platform: &mut Platform) -> Result<Self> {
-        let vertices = load_obj_verts("models/bigbunny.obj")?;
-        let vertices: Vec<Vertex> = vertices.into_iter().map(|pos| Vertex {
-            pos,
-            color: [1.; 3],
-        }).collect();
+        let vertices: Vec<Vertex> = load_obj_verts("models/bigbunny.obj")?
+            .into_iter()
+            .zip(trivial_random(0).map(u64_color))
+            .map(|(pos, color)| Vertex { pos, color })
+            .collect();
 
         //let indices = (0..vertices.len()).collect();
 
@@ -76,3 +83,36 @@ fn rainbow_cube() -> (Vec<Vertex>, Vec<u32>) {
     (vertices, indices)
 }
 */
+
+pub struct FxHasher {
+    pub hash: u64,
+}
+
+impl Default for FxHasher {
+    #[inline]
+    fn default() -> Self {
+        Self { hash: 0 }
+    }
+}
+
+impl FxHasher {
+    const K: u64 = 0x517cc1b727220a95;
+
+    #[inline]
+    pub fn add_to_hash(&mut self, i: u64) {
+        self.hash = self.hash.rotate_left(5).bitxor(i).wrapping_mul(Self::K);
+    }
+
+    #[inline]
+    pub fn finish(&self) -> u64 {
+        self.hash as u64
+    }
+}
+
+fn trivial_random(seed: u64) -> impl Iterator<Item = u64> {
+    let mut hasher = FxHasher { hash: seed };
+    (0..).map(move |x| {
+        hasher.add_to_hash(x);
+        hasher.finish()
+    })
+}
