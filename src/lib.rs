@@ -41,6 +41,8 @@ pub fn dbscan_parents<const D: usize>(points: &[[f32; D]], radius: f32, min_pts:
 
         let mut queue = neighbors;
 
+        let mut child_neighbors = vec![];
+
         while let Some((neighbor_idx, neighbors_parent_idx)) = queue.pop() {
             if label[neighbor_idx] == Label::Noise {
                 label[neighbor_idx] = Label::Cluster {
@@ -58,11 +60,11 @@ pub fn dbscan_parents<const D: usize>(points: &[[f32; D]], radius: f32, min_pts:
                 prev: neighbors_parent_idx,
             };
 
-            let neighbors = || accel.query_neighbors(points, neighbor_idx);
+            child_neighbors.extend(accel.query_neighbors(points, neighbor_idx));
 
-            if neighbors().count() >= min_pts {
+            if child_neighbors.len() >= min_pts {
                 let pair_with_parent_idx = |sub_neighbor_idx| (sub_neighbor_idx, neighbor_idx);
-                queue.extend(neighbors().map(pair_with_parent_idx));
+                queue.extend(child_neighbors.drain(..).map(pair_with_parent_idx));
             }
         }
 
