@@ -1,9 +1,8 @@
-use few_pretty_graphs::obj::load_obj_verts;
 use few_pretty_graphs::{dbscan_parents, Label};
-use std::ops::BitXor;
+use geoprofile_core::{Label as GeoLabel, Row, Corner, Face};
 //use idek::{prelude::*, IndexBuffer, MultiPlatformCamera};
 use idek::{prelude::*, MultiPlatformCamera};
-use std::path::PathBuf;
+use std::{path::PathBuf, ops::BitXor};
 use structopt::StructOpt;
 
 fn main() -> Result<()> {
@@ -47,8 +46,14 @@ fn u64_color(u: u64) -> [f32; 3] {
 
 impl App<Opt> for FewPrettyGraphs {
     fn init(ctx: &mut Context, platform: &mut Platform, args: Opt) -> Result<Self> {
-        let points = load_obj_verts(args.obj_path)?;
-        let (n_clusters, labels) = dbscan_parents(&points, args.radius, args.min_pts);
+        let board = geoprofile_core::load_board(args.obj_path)?;
+        let sets = extract_label_sets(&board);
+        let label_idx: i32 = GeoLabel::Wood(Face::Top).into();
+        let points = &sets[label_idx as usize].1;
+
+        let time = std::time::Instant::now();
+        let (n_clusters, labels) = dbscan_parents(points, args.radius, args.min_pts);
+        dbg!(time.elapsed().as_secs_f32());
 
         dbg!(n_clusters);
 
@@ -72,7 +77,7 @@ impl App<Opt> for FewPrettyGraphs {
         let points_vertices: Vec<Vertex> = points
             .into_iter()
             .zip(labels)
-            .map(|(pos, label)| Vertex {
+            .map(|(&pos, label)| Vertex {
                 pos,
                 color: match label {
                     Label::Undefined => [1., 0., 1.],
@@ -122,27 +127,24 @@ impl App<Opt> for FewPrettyGraphs {
     }
 }
 
-/*
-fn rainbow_cube() -> (Vec<Vertex>, Vec<u32>) {
-    let vertices = vec![
-        Vertex::new([-1.0, -1.0, -1.0], [0.0, 1.0, 1.0]),
-        Vertex::new([1.0, -1.0, -1.0], [1.0, 0.0, 1.0]),
-        Vertex::new([1.0, 1.0, -1.0], [1.0, 1.0, 0.0]),
-        Vertex::new([-1.0, 1.0, -1.0], [0.0, 1.0, 1.0]),
-        Vertex::new([-1.0, -1.0, 1.0], [1.0, 0.0, 1.0]),
-        Vertex::new([1.0, -1.0, 1.0], [1.0, 1.0, 0.0]),
-        Vertex::new([1.0, 1.0, 1.0], [0.0, 1.0, 1.0]),
-        Vertex::new([-1.0, 1.0, 1.0], [1.0, 0.0, 1.0]),
-    ];
+fn extract_label_sets(rows: &[Row]) -> Vec<(GeoLabel, Vec<[f32; 3]>)> {
+    const DOWNSCALE: f32 = 1000.;
+    let mut sets: Vec<(GeoLabel, Vec<[f32; 3]>)> = (0..GeoLabel::N_CLASSES)
+        .map(|idx| (GeoLabel::from(idx as i32), vec![]))
+        .collect();
 
-    let indices = vec![
-        3, 1, 0, 2, 1, 3, 2, 5, 1, 6, 5, 2, 6, 4, 5, 7, 4, 6, 7, 0, 4, 3, 0, 7, 7, 2, 3, 6, 2, 7,
-        0, 5, 4, 1, 5, 0,
-    ];
+    for row in rows {
+        if let Some(labels) = row.labels.as_ref() {
+            for (point, &label) in row.points.iter().zip(labels) {
+                let pos = [point.x, point.y, row.length_position].map(|v| v / DOWNSCALE);
+                let set_idx: i32 = label.into();
+                sets[set_idx as usize].1.push(pos);
+            }
+        }
+    }
 
-    (vertices, indices)
+    sets
 }
-*/
 
 /// FxHasher
 /// https://nnethercote.github.io/2021/12/08/a-brutally-effective-hash-function-in-rust.html

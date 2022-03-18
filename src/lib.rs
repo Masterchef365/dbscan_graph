@@ -1,4 +1,3 @@
-pub mod obj;
 use dbscan::QueryAccelerator;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -12,8 +11,11 @@ pub enum Label {
 pub fn dbscan_parents<const D: usize>(points: &[[f32; D]], radius: f32, min_pts: usize) -> (u32, Vec<Label>) {
     let mut label = vec![Label::Undefined; points.len()];
 
+    let time = std::time::Instant::now();
     let accel = QueryAccelerator::new(points, radius);
+    println!("Query build: {}s", time.elapsed().as_secs_f32());
 
+    let time = std::time::Instant::now();
     let mut current_cluster = 0;
 
     // TODO: Don't iterate by point, iterate by query accel chunk (Hope for fewer cache misses)
@@ -66,6 +68,8 @@ pub fn dbscan_parents<const D: usize>(points: &[[f32; D]], radius: f32, min_pts:
 
         current_cluster += 1;
     }
+
+    println!("DBSCAN: {}s", time.elapsed().as_secs_f32());
 
     (current_cluster, label)
 }
