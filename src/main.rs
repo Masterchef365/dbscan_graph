@@ -8,10 +8,11 @@ use structopt::StructOpt;
 
 fn main() -> Result<()> {
     // TODO: get VR as arg. Must modify idek...
-    launch::<FewPrettyGraphs>(Settings::default().vr(std::env::var("VR").is_ok()))
+    let opt = Opt::from_args();
+    launch::<Opt, FewPrettyGraphs>(Settings::default().vr(opt.vr).args(opt))
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Default)]
 #[structopt(name = "A few pretty graphs", about = "DBSCAN go brrrrr")]
 struct Opt {
     /// Model
@@ -24,6 +25,10 @@ struct Opt {
     /// Cluster minimum points
     #[structopt(short, long)]
     min_pts: usize,
+
+    /// Use VR
+    #[structopt(short, long)]
+    vr: bool,
 }
 
 struct FewPrettyGraphs {
@@ -40,9 +45,8 @@ fn u64_color(u: u64) -> [f32; 3] {
     rgb.map(|x| x as f32 / u8::MAX as f32)
 }
 
-impl App for FewPrettyGraphs {
-    fn init(ctx: &mut Context, platform: &mut Platform) -> Result<Self> {
-        let args = Opt::from_args();
+impl App<Opt> for FewPrettyGraphs {
+    fn init(ctx: &mut Context, platform: &mut Platform, args: Opt) -> Result<Self> {
         let points = load_obj_verts(args.obj_path)?;
         let (n_clusters, labels) = dbscan_parents(&points, args.radius, args.min_pts);
 
